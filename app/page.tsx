@@ -547,6 +547,31 @@ export default function FiberVaultPage() {
         </div>
       </header>
 
+      <section className="intro-panel" aria-labelledby="page-title">
+        <div className="intro-copy">
+          <p className="intro-eyebrow">TRUSTLESS DIGITAL DELIVERY / CKB FIBER</p>
+          <h1 className="intro-title" id="page-title">
+            The key is <span>the payment.</span>
+          </h1>
+          <p className="intro-description">
+            FiberVault encrypts digital content before it is shared. The buyer pays through Fiber Network;
+            settlement reveals the key and unlocks the original document.
+          </p>
+        </div>
+        <div className="intro-specs" aria-label="Protocol specifications">
+          <div className="intro-spec">
+            <span className="intro-spec-label">ACCESS PRICE</span>
+            <strong>1 <span>CKB</span></strong>
+            <span className="intro-spec-note">Fixed invoice amount</span>
+          </div>
+          <div className="intro-spec">
+            <span className="intro-spec-label">CONTENT LOCK</span>
+            <strong>AES-256</strong>
+            <span className="intro-spec-note">Authenticated encryption</span>
+          </div>
+        </div>
+      </section>
+
       {/* Offline Sandbox Prominent Telemetry Banner */}
       {engineMode === 'simulator' && (
         <div className="system-banner info">
