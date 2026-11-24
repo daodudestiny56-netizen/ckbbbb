@@ -8,12 +8,15 @@ import {
   verifyPreimageProof,
   serializeVaultReport,
   deserializeVaultReport,
+  wrapContentKey,
+  unwrapContentKey,
   toHex,
 } from './lib/crypto.ts';
 import { VAULT_PRESETS } from './lib/vault-presets.ts';
+import { payForOffer, validateOffer } from './lib/payment.ts';
 
 test('AES-256-GCM encryption and decryption roundtrip produces identical plaintext', async () => {
-  const plaintext = 'Classified zero-day report payload: vulnerability confirmed.';
+  const plaintext = 'Classified energy dispatch model payload: optimization verified.';
   const encrypted = await encryptResult(plaintext);
 
   assert.ok(encrypted.key.startsWith('0x'));
@@ -26,7 +29,7 @@ test('AES-256-GCM encryption and decryption roundtrip produces identical plainte
 });
 
 test('Decryption with unauthorized random key is strictly rejected by AES-GCM authentication tag', async () => {
-  const plaintext = 'Secret Alpha';
+  const plaintext = 'Secret Research Brief';
   const encrypted = await encryptResult(plaintext);
 
   const fakeKeyBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -69,8 +72,10 @@ test('Cryptographic preimage SHA-256 verification binds payment hash to AES-GCM 
   assert.equal(verification.valid, true);
   assert.equal(verification.preimageMatchesHash, true);
   assert.equal(verification.computedPaymentHash?.toLowerCase(), paymentHash.toLowerCase());
+});
 
-  // Mismatched payment hash test
+test('Wrong payment hash fails SDK preimage verification', async () => {
+  const encrypted = await encryptResult('TLC Bound Payload');
   const wrongHash = `0x${'f'.repeat(64)}`;
   const failedVerification = await verifyPreimageProof(encrypted.key, wrongHash);
   assert.equal(failedVerification.valid, false);
@@ -92,6 +97,46 @@ test('Vault structured reports serialize and deserialize with full metadata fide
   }
 });
 
+test('Optional wrap-to-buyer-key mode wraps content key and unwrap restores identical key', async () => {
+  const contentKey = `0x${'a1'.repeat(32)}`;
+  const buyerSecret = `0x${'b2'.repeat(32)}`;
+
+  // Wrap content key
+  const bundle = await wrapContentKey(contentKey, buyerSecret);
+  assert.ok(bundle.wrappedKey.startsWith('0x'));
+  assert.ok(bundle.wrapIv.startsWith('0x'));
+
+  // Intermediate node with wrong secret fails to unwrap
+  const wrongSecret = `0x${'00'.repeat(32)}`;
+  await assert.rejects(
+    unwrapContentKey(bundle.wrappedKey, bundle.wrapIv, wrongSecret),
+    /operation failed|tag mismatch|decrypt/i,
+  );
+
+  // Buyer with correct secret unwraps original key
+  const unwrapped = await unwrapContentKey(bundle.wrappedKey, bundle.wrapIv, buyerSecret);
+  assert.equal(unwrapped, contentKey);
+});
+
+test('Replayed offer with mismatched attempted payment hash is rejected before submission', async () => {
+  const hash = `0x${'b'.repeat(64)}`;
+  const previousAttempt = `0x${'c'.repeat(64)}`;
+  const offer = { invoice: 'fibt-example', paymentHash: hash, lastHop: {} };
+
+  const node = {
+    parseInvoice: async () => ({
+      invoice: { currency: 'Fibt', amount: '0x5f5e100', data: { payment_hash: hash } },
+    }),
+    sendPayment: async () => assert.fail('Should not be called'),
+    getPayment: async () => assert.fail('Should not be called'),
+  };
+
+  await assert.rejects(
+    payForOffer(node, offer, previousAttempt, () => {}),
+    /Restore the offer for the previous payment/,
+  );
+});
+
 test('Simulator engine executes full end-to-end pay-to-unlock flow faithfully', async () => {
   const { FiberSimulatorEngine } = await import('./lib/simulator.ts');
   const sim = new FiberSimulatorEngine();
@@ -107,8 +152,8 @@ test('Simulator engine executes full end-to-end pay-to-unlock flow faithfully', 
   assert.equal(channels.seller.channelReady, true);
 
   // 3. Create offer
-  const secretContent = 'Autonomous AI Agent Private Weights & Secrets';
-  const { offer, offerJson } = await sim.createOffer(secretContent);
+  const secretContent = 'Autonomous Energy Grid Dispatch Model & Private Weights';
+  const { offer } = await sim.createOffer(secretContent);
   assert.equal(offer.version, 2);
   assert.equal(offer.cipher, 'AES-256-GCM');
   assert.ok(offer.invoice.startsWith('fibt'));
