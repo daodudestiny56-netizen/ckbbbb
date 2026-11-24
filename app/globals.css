@@ -518,6 +518,65 @@ main {
   border-color: var(--orange);
 }
 
+.bus-status-tag.online {
+  background: var(--orange-light);
+  color: var(--orange-hover);
+  border-color: var(--orange);
+}
+
+.bus-address-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bus-address {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-low);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.copy-address {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border: 2px solid var(--black);
+  background: var(--white);
+  box-shadow: 2px 2px 0 var(--black);
+  color: var(--black);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s, background 0.08s;
+}
+
+.copy-address:hover {
+  background: var(--orange-light);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--orange);
+}
+
+.copy-address:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--black);
+}
+
+.bus-peer-state {
+  margin: 0;
+  color: var(--grey-600);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.bus-peer-state strong {
+  color: var(--black);
+}
+
 .bus-metrics {
   font-family: var(--font-mono);
   font-size: 12px;

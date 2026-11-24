@@ -115,6 +115,15 @@ export default function FiberVaultPage() {
     };
   }, []);
 
+  function changeEngineMode(mode: EngineMode) {
+    setEngineMode(mode);
+    setStatusMsg(
+      mode === 'simulator'
+        ? { type: 'info', text: '[SANDBOX] Offline simulator active. No CKB testnet transactions will be sent.' }
+        : { type: 'info', text: 'Fiber Testnet WASM engine active. Start Buyer A and Seller C nodes to connect to Bottle.' },
+    );
+  }
+
   function selectPreset(index: number) {
     setActivePresetIndex(index);
     if (index < VAULT_PRESETS.length) {
@@ -179,6 +188,21 @@ export default function FiberVaultPage() {
       setStatusMsg({
         type: 'error',
         text: `Failed to refresh channel for ${role}: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  async function copyTestnetAddress(role: Role) {
+    const address = addresses[role];
+    if (!address) return;
+
+    try {
+      await navigator.clipboard.writeText(address);
+      setStatusMsg({ type: 'success', text: `${role.toUpperCase()} CKB Testnet address copied to clipboard.` });
+    } catch (err) {
+      setStatusMsg({
+        type: 'error',
+        text: `Could not copy ${role.toUpperCase()} CKB Testnet address: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
   }
@@ -514,6 +538,25 @@ export default function FiberVaultPage() {
       ? simNodes.seller.channelReady
       : Boolean(channels.seller && ready(channels.seller) && BigInt(channels.seller.remote_balance) >= 100_000_000n);
 
+  const isBuyerNodeOnline = engineMode === 'simulator' ? simNodes.buyer.connected : Boolean(addresses.buyer);
+  const isSellerNodeOnline = engineMode === 'simulator' ? simNodes.seller.connected : Boolean(addresses.seller);
+  const buyerNodeStatus =
+    engineMode === 'simulator'
+      ? simNodes.buyer.channelReady
+        ? 'CHANNEL_READY'
+        : isBuyerNodeOnline
+          ? 'NODE_ONLINE'
+          : 'OFFLINE'
+      : channels.buyer?.state.state_name ?? (isBuyerNodeOnline ? 'NODE_ONLINE' : 'OFFLINE');
+  const sellerNodeStatus =
+    engineMode === 'simulator'
+      ? simNodes.seller.channelReady
+        ? 'CHANNEL_READY'
+        : isSellerNodeOnline
+          ? 'NODE_ONLINE'
+          : 'OFFLINE'
+      : channels.seller?.state.state_name ?? (isSellerNodeOnline ? 'NODE_ONLINE' : 'OFFLINE');
+
   const isRouteReady = isBuyerReady && isSellerReady;
 
   return (
@@ -534,13 +577,13 @@ export default function FiberVaultPage() {
         <div className="engine-segmented">
           <button
             className={`engine-segment-btn ${engineMode === 'testnet' ? 'active' : ''}`}
-            onClick={() => setEngineMode('testnet')}
+            onClick={() => changeEngineMode('testnet')}
           >
             [Testnet] Live WASM
           </button>
           <button
             className={`engine-segment-btn ${engineMode === 'simulator' ? 'active' : ''}`}
-            onClick={() => setEngineMode('simulator')}
+            onClick={() => changeEngineMode('simulator')}
           >
             [Sandbox] Offline Simulator
           </button>
@@ -628,14 +671,16 @@ export default function FiberVaultPage() {
           <div>
             <strong style={{ display: 'block', marginBottom: 4 }}>Route Readiness Notice:</strong>
             <ul style={{ margin: 0, paddingLeft: 16 }}>
-              {!channels.buyer && <li>Buyer A node is not started or channel is not opened.</li>}
+              {!isBuyerNodeOnline && <li>Buyer A node is offline. Start the WASM node to continue.</li>}
+              {isBuyerNodeOnline && !channels.buyer && <li>Buyer A node is online; open a channel to Bottle.</li>}
               {channels.buyer && !ready(channels.buyer) && (
                 <li>Buyer A channel state is: <code>{channels.buyer.state.state_name}</code> (requires CHANNEL_READY).</li>
               )}
               {channels.buyer && ready(channels.buyer) && BigInt(channels.buyer.local_balance) < 100_000_000n && (
                 <li>Buyer A local balance is {ckb(channels.buyer.local_balance)} CKB (needs &gt;= 1 CKB to pay).</li>
               )}
-              {!channels.seller && <li>Seller C node is not started or channel is not opened.</li>}
+              {!isSellerNodeOnline && <li>Seller C node is offline. Start the WASM node to continue.</li>}
+              {isSellerNodeOnline && !channels.seller && <li>Seller C node is online; open a channel to Bottle.</li>}
               {channels.seller && !ready(channels.seller) && (
                 <li>Seller C channel state is: <code>{channels.seller.state.state_name}</code> (requires CHANNEL_READY).</li>
               )}
@@ -658,14 +703,8 @@ export default function FiberVaultPage() {
           <div className={`bus-node-card ${isBuyerReady ? 'ready' : ''}`}>
             <div className="bus-node-header">
               <span className="bus-node-title">Buyer A Node</span>
-              <span className={`bus-status-tag ${isBuyerReady ? 'ready' : ''}`}>
-                {engineMode === 'simulator'
-                  ? simNodes.buyer.channelReady
-                    ? 'CHANNEL_READY'
-                    : 'OFFLINE'
-                  : channels.buyer
-                  ? channels.buyer.state.state_name
-                  : 'OFFLINE'}
+              <span className={`bus-status-tag ${isBuyerReady ? 'ready' : isBuyerNodeOnline ? 'online' : ''}`}>
+                {buyerNodeStatus}
               </span>
             </div>
 
@@ -693,10 +732,25 @@ export default function FiberVaultPage() {
               <>
                 {addresses.buyer ? (
                   <>
-                    <code style={{ fontSize: 11, color: 'var(--text-low)' }}>{addresses.buyer.slice(0, 24)}...</code>
+                    <div className="bus-address-row">
+                      <code className="bus-address">{addresses.buyer}</code>
+                      <button
+                        type="button"
+                        className="copy-address"
+                        aria-label="Copy Buyer A CKB testnet address"
+                        onClick={() => copyTestnetAddress('buyer')}
+                      >
+                        Copy Address
+                      </button>
+                    </div>
                     <a href="https://faucet.nervos.org" target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--signal-accent)', textDecoration: 'none' }}>
                       Request Testnet CKB
                     </a>
+                    {connected.buyer !== undefined && (
+                      <p className="bus-peer-state">
+                        Bottle peer: <strong>{connected.buyer ? 'CONNECTED' : 'NOT CONNECTED'}</strong>
+                      </p>
+                    )}
                     {channels.buyer && (
                       <p className="bus-metrics" style={{ margin: 0 }}>
                         Local: <strong>{ckb(channels.buyer.local_balance)} CKB</strong> | Bottle: <strong>{ckb(channels.buyer.remote_balance)} CKB</strong>
@@ -750,14 +804,8 @@ export default function FiberVaultPage() {
           <div className={`bus-node-card ${isSellerReady ? 'ready' : ''}`}>
             <div className="bus-node-header">
               <span className="bus-node-title">Seller C Node</span>
-              <span className={`bus-status-tag ${isSellerReady ? 'ready' : ''}`}>
-                {engineMode === 'simulator'
-                  ? simNodes.seller.channelReady
-                    ? 'CHANNEL_READY'
-                    : 'OFFLINE'
-                  : channels.seller
-                  ? channels.seller.state.state_name
-                  : 'OFFLINE'}
+              <span className={`bus-status-tag ${isSellerReady ? 'ready' : isSellerNodeOnline ? 'online' : ''}`}>
+                {sellerNodeStatus}
               </span>
             </div>
 
@@ -776,10 +824,25 @@ export default function FiberVaultPage() {
               <>
                 {addresses.seller ? (
                   <>
-                    <code style={{ fontSize: 11, color: 'var(--text-low)' }}>{addresses.seller.slice(0, 24)}...</code>
+                    <div className="bus-address-row">
+                      <code className="bus-address">{addresses.seller}</code>
+                      <button
+                        type="button"
+                        className="copy-address"
+                        aria-label="Copy Seller C CKB testnet address"
+                        onClick={() => copyTestnetAddress('seller')}
+                      >
+                        Copy Address
+                      </button>
+                    </div>
                     <a href="https://faucet.nervos.org" target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--signal-accent)', textDecoration: 'none' }}>
                       Request Testnet CKB
                     </a>
+                    {connected.seller !== undefined && (
+                      <p className="bus-peer-state">
+                        Bottle peer: <strong>{connected.seller ? 'CONNECTED' : 'NOT CONNECTED'}</strong>
+                      </p>
+                    )}
                     {channels.seller && (
                       <p className="bus-metrics" style={{ margin: 0 }}>
                         Local: <strong>{ckb(channels.seller.local_balance)} CKB</strong> | Bottle: <strong>{ckb(channels.seller.remote_balance)} CKB</strong>
