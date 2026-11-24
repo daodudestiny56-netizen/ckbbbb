@@ -1,202 +1,204 @@
-# FiberVault: Trustless Encrypted Data Delivery on CKB Fiber Network
+# FiberVault
 
-[![CKB Testnet](https://img.shields.io/badge/Network-CKB%20Testnet-green.svg)](https://faucet.nervos.org)
-[![Fiber Network](https://img.shields.io/badge/Fiber%20Network-v0.10.1-emerald.svg)](https://www.fiber.world)
-[![Next.js](https://img.shields.io/badge/Next.js-16.2.6-black.svg)](https://nextjs.org)
-[![Tests](https://img.shields.io/badge/Tests-18%20Passing-brightgreen.svg)]()
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
+![CKB Testnet](https://img.shields.io/badge/network-CKB%20testnet-F07824)
+![Fiber Network](https://img.shields.io/badge/protocol-Fiber%20v0.10.1-222222)
+![Next.js](https://img.shields.io/badge/framework-Next.js%2016-000000)
+![Tests](https://img.shields.io/badge/tests-18%20passing-2E7D32)
 
-> **Submission for CKB Fiber Network Campaign: Quest 2 (Advanced) - Pay-to-Unlock**  
-> GitHub Repository: [https://github.com/daodudestiny56-netizen/ckbbbb](https://github.com/daodudestiny56-netizen/ckbbbb)  
-> Deployment: Run locally on Node.js (requires WebAssembly cross-origin isolation)
+**Encrypted digital delivery where successful payment reveals the decryption key.**
 
----
+FiberVault is a browser-based demonstration of pay-to-unlock content using CKB Fiber Network payment channels. Sellers encrypt a report locally and create a 1 CKB Fiber invoice whose payment preimage is the content key. After the invoice settles, the buyer receives the preimage and decrypts the report in the browser.
 
-## What It Does
+| Resource | Link |
+| --- | --- |
+| Live application | [ckbbbb.vercel.app](https://ckbbbb.vercel.app) |
+| Source repository | [daodudestiny56-netizen/ckbbbb](https://github.com/daodudestiny56-netizen/ckbbbb) |
+| CKB testnet faucet | [faucet.nervos.org](https://faucet.nervos.org) |
 
-FiberVault is a trustless, atomic pay-to-unlock marketplace built on top of the CKB Fiber Network testnet. It allows a seller to publish an encrypted digital asset (such as an engineering research brief or design token package) alongside a free public preview, while keeping the full content mathematically locked behind a 1 CKB Fiber invoice.
+> FiberVault is a testnet demonstration, not a production marketplace or custody service. Read [Security model and limitations](#security-model-and-limitations) before using it.
 
-The unlocking mechanism does not rely on a trusted third-party server. Instead, it binds symmetric encryption directly to Fiber Network payment channel contracts:
+## At a glance
 
-1. The seller encrypts the confidential payload using authenticated **AES-256-GCM**, generating a random 32-byte secret key and a 12-byte initialization vector (IV).
-2. The seller creates a Fiber invoice where the **payment preimage is the exact 32-byte AES key**:
-   ```text
-   payment_hash = SHA-256(AES_Key)
-   ```
-3. The seller distributes the public offer (containing ciphertext, IV, and the Fiber invoice) out-of-band to the buyer.
-4. The buyer verifies the invoice and attempts unauthorized decryption to verify that the cipher rejects reads without the key.
-5. The buyer pays the 1 CKB invoice through the Fiber Network multi-hop route (`Buyer A -> Bottle B -> Seller C`).
-6. To claim the funds, the seller's node reveals the preimage to the channel network. The settled preimage returns to Buyer A upon payment completion.
-7. Buyer A inputs the revealed preimage into the AES-256-GCM decryptor, unlocking the full original text.
+- **Client-side encryption:** Web Crypto API AES-256-GCM encrypts the report in the seller's browser.
+- **Payment-bound key release:** The AES key is the invoice preimage; its SHA-256 digest is the invoice payment hash.
+- **Fiber routing:** The buyer pays across the testnet channel route `Buyer -> Bottle -> Seller`.
+- **Offer validation:** Versioned offer parsing checks the encrypted payload structure and Bottle last-hop hint. The buyer node also checks invoice currency, amount, and payment hash.
+- **Two operating modes:** Live Fiber testnet nodes and a clearly labeled offline simulator. The simulator makes no blockchain transactions.
+- **Cryptographic receipt:** The interface verifies the revealed preimage against the payment hash and can export a receipt.
 
----
+## System architecture
 
-## Why It Matters
+The Next.js application is the browser interface; encryption, decryption, and Fiber WASM node sessions run client-side. The offer is transferred from seller to buyer outside the payment route, for example by copying its JSON.
 
-Standard Web2 paywalls force the user to pay first and trust that the seller's server will deliver the purchased file. If the server crashes or reneges, the buyer loses funds.
+```mermaid
+flowchart LR
+  subgraph SellerBrowser["Seller browser"]
+    SellerUI["Seller Studio"]
+    Report["Structured report"]
+    Encrypt["Web Crypto API<br/>AES-256-GCM"]
+    SellerNode["Seller Fiber Browser Node<br/>WASM"]
+    Offer["Version 2 offer JSON<br/>ciphertext, IV, invoice,<br/>payment hash, last-hop hint"]
 
-With Fiber's Hash Time-Locked Contracts (TLCs), **payment settlement and key revelation are atomic**. The seller cannot claim the 1 CKB without revealing the preimage across the channel route, and the buyer automatically receives the preimage the moment the payment settles.
+    SellerUI --> Report --> Encrypt
+    Encrypt -->|"ciphertext and IV"| Offer
+    Encrypt -->|"AES key as invoice preimage"| SellerNode
+    SellerNode -->|"invoice and payment hash"| Offer
+  end
 
----
+  subgraph BuyerBrowser["Buyer browser"]
+    BuyerUI["Buyer Terminal"]
+    Validate["Parse offer and validate invoice"]
+    BuyerNode["Buyer Fiber Browser Node<br/>WASM"]
+    Decrypt["Verify preimage and decrypt"]
 
-## What I Changed from the Official Starter Kit
+    BuyerUI --> Validate --> BuyerNode
+    BuyerNode -->|"settlement result and preimage"| Decrypt
+  end
 
-I adapted the official `fiber-encrypted-data-payment` starter kit into a structured marketplace application. The table below lists every modified and added file, verified against `git diff`:
+  subgraph Testnet["CKB Fiber testnet"]
+    Bottle["Bottle routing node"]
+  end
 
-| File / Component | Official Starter | What I Changed in FiberVault |
-|:---|:---|:---|
-| `app/page.tsx` | Single linear script with raw textareas and 2-line plain text | Rebuilt into an interactive two-panel terminal (Seller Studio and Buyer Terminal) with route diagnostics, dynamic redaction paywalls, and verification badges. |
-| `app/globals.css` | 20 lines of basic styling | Custom responsive layout with animated redaction bars (`.redacted-paywall`), channel topology cards, and status indicators. |
-| `lib/crypto.ts` | 39 lines: basic `encryptResult` / `decryptResult` | Added `verifyPreimageProof` using the SDK's `verifyPreimageHash`, `testDecryption` for failure validation, structured report serialization, and optional recipient key-wrapping (`wrapContentKey` / `unwrapContentKey`). |
-| `lib/vault-presets.ts` | Did not exist | Added realistic, harmless presets: Energy Grid Research Brief, Institutional Macro Analysis, and Design Token Packages, plus custom content authoring. |
-| `lib/vault-types.ts` | Did not exist | TypeScript definitions for structured reports and verification payloads. |
-| `lib/simulator.ts` | Did not exist | Offline sandbox mock engine for fast local UI testing without requiring live testnet faucet confirmations. Clearly labeled as mock. |
-| `vault.test.mjs` | Did not exist | Added 9 new unit and integration tests covering AES-GCM roundtrips, unauthorized tag rejection, ciphertext tampering detection, SHA-256 proof validation, preset serialization, recipient key-wrapping, replayed offer rejection, and simulator execution. |
-| `package.json` | Tested only `payment.test.mjs` | Updated `test` script to run both `payment.test.mjs` and `vault.test.mjs`. |
+  Offer -. "manual, out-of-band transfer" .-> BuyerUI
+  BuyerNode -->|"payment over channel"| Bottle
+  Bottle -->|"forwarded payment"| SellerNode
+  SellerNode -->|"settlement reveals preimage"| BuyerNode
+  Offer --> Decrypt
+```
 
----
+### Main components
 
-## How to Run Locally
+| Component | Responsibility |
+| --- | --- |
+| `app/page.tsx` | Seller Studio, Buyer Terminal, channel setup, payment steps, and status reporting |
+| `app/globals.css` and `app/layout.tsx` | Responsive white-and-orange neo-brutalist UI and Bricolage Grotesque typography |
+| `lib/crypto.ts` | AES-GCM encryption/decryption, preimage verification, and report serialization |
+| `lib/offer.ts` | Version 2 encrypted offer creation, parsing, and structural validation |
+| `lib/fiber.ts` | Testnet browser-node setup, Bottle peer connection, and channel operations |
+| `lib/payment.ts` and `lib/payment-submission.ts` | Invoice validation, expiration checks, safe submission, and payment-result recovery |
+| `lib/node-session.ts` | Exclusive browser-tab ownership for saved Fiber node profiles |
+| `lib/simulator.ts` | Offline mock nodes, channels, offers, and payments for UI walkthroughs |
+| `lib/progress.ts` | Validation and persistence helpers for non-secret lesson progress |
 
-### Prerequisites
-- Node.js v22.18.0 or newer (tested on v24.11.1)
-- npm v10.0.0 or newer
-- Modern browser (Chrome, Brave, Edge) with WebAssembly and Web Locks support
+## Payment and unlock lifecycle
 
-### Commands
+1. **Prepare content.** The seller selects a sample report or authors custom content.
+2. **Encrypt locally.** The browser generates a random 32-byte AES key and 12-byte IV, then encrypts the report with AES-256-GCM.
+3. **Create the invoice.** The seller's Fiber node creates a 1 CKB invoice using the AES key as its payment preimage and SHA-256 as the hash algorithm.
+4. **Share the offer.** The seller sends the offer JSON to the buyer out-of-band. It contains ciphertext, IV, invoice, payment hash, and a last-hop hint; it does not contain the plaintext report.
+5. **Validate and challenge.** The buyer checks the offer and invoice, then can try decrypting with a random key to confirm AES-GCM rejects it.
+6. **Pay over Fiber.** The buyer submits the invoice through the `Buyer -> Bottle -> Seller` route.
+7. **Verify and unlock.** After settlement, the buyer receives the preimage, verifies that its SHA-256 matches the invoice payment hash, and decrypts the report.
+8. **Export.** The buyer can download the unlocked Markdown report and a JSON payment receipt.
 
-```sh
-# 1. Clone repository
+The key relationship is:
+
+```text
+payment_hash = SHA-256(AES_key)
+```
+
+The application checks the invoice amount and currency against the expected 1 CKB testnet invoice. Payment submission is guarded against expired invoices, mismatched hashes, and accidental resubmission of pending attempts.
+
+## Run locally
+
+### Requirements
+
+- Node.js 22.18 or later
+- npm 10 or later
+- A modern browser with WebAssembly, Web Crypto, and Web Locks support
+
+### Install and start
+
+```bash
 git clone https://github.com/daodudestiny56-netizen/ckbbbb.git
 cd ckbbbb
-
-# 2. Install dependencies
-npm install
-
-# 3. Run automated test suite (all 18 tests pass)
-npm test
-
-# 4. Start local development server
+npm ci
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser.
+Open [http://localhost:3001](http://localhost:3001).
 
-> [!NOTE]
-> Fiber's WebAssembly runtime requires cross-origin isolation (`SharedArrayBuffer` and `Web Locks`). The Next.js dev server serves the required `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers configured in `next.config.mjs`.
+### Validate the project
 
----
+```bash
+npm test
+npm run typecheck
+npm run build
+```
 
-## Live Testnet Flow Walkthrough
+`npm start` serves the production build on Next.js's default port. The development server uses port `3001`.
 
-The application defaults to **[Testnet] Live WASM Node**. An **[Offline Sandbox]** toggle is available for testing the UI without waiting for block confirmations.
+### WebAssembly isolation headers
 
-### Step 1: Start Nodes and Fund Channels
-1. In the Network Topology section, start **Buyer A** and **Seller C**.
-2. Copy each node's address to the [Nervos Testnet Faucet](https://faucet.nervos.org) and request Testnet CKB.
-3. Once funded, click **Open 500 CKB Channel** with Bottle for both nodes.
-4. Wait for on-chain block confirmation until both channels report `CHANNEL_READY`.
-5. On the Seller side, click **Send 5 CKB keysend** to Bottle. This shifts 5 CKB of balance to Bottle's side of the channel, giving Bottle the inbound liquidity needed to route incoming payments to the Seller.
+The Fiber browser runtime requires cross-origin isolation. `next.config.mjs` configures:
 
-### Step 2: Encrypt and Create Offer (Seller Studio)
-1. Select an intelligence brief preset (or enter custom text).
-2. Click **Encrypt and Create 1 CKB Invoice**.
-3. The seller's browser generates an AES-256-GCM key, encrypts the payload, and calls `seller.newInvoice` with `payment_preimage = key` and `hash_algorithm: 'sha256'`.
-4. Click **1-Click Bridge to Buyer** (or copy the generated offer JSON manually).
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Embedder-Policy: require-corp`
 
-### Step 3: Validate and Challenge Decryption (Buyer Terminal)
-1. In the Buyer Terminal, click **Validate Offer & Invoice**. The app decodes the invoice and checks that the amount is 1 CKB and the payment hash matches.
-2. The public executive teaser is displayed in readable text, while the confidential section is obscured by animated redaction bars.
-3. Click **Challenge: Decrypt Without Key**. The app attempts AES-GCM decryption with a random 256-bit key. The browser's Web Crypto API rejects the operation with an authentication tag mismatch, proving the content cannot be forged or read without the preimage.
+These headers are required for browser capabilities such as `SharedArrayBuffer`. Keep them enabled when changing the hosting configuration.
 
-### Step 4: Pay Invoice
-1. Click **Pay 1 CKB with Fiber Network**.
-2. Buyer A sends payment through Bottle B to Seller C.
-3. Upon settlement, the payment receipt displays:
-   - Payment status: `Success`
-   - Actual routing fee paid to Bottle (e.g. `0.001 CKB`)
-   - Payment hash: `0x...`
-   - Revealed Preimage: `0x...`
+## Live CKB testnet walkthrough
 
-### Step 5: Decrypt and Export
-1. Click **Decrypt with Revealed Preimage Key**.
-2. The revealed preimage is imported as the AES-256-GCM key.
-3. The redaction bars dissolve and the full intelligence report is displayed.
-4. Click **Download Full Report (.md)** or **Download Cryptographic Receipt (.json)**.
+The application starts in **Live WASM** mode. Testnet nodes and channel operations use real CKB testnet resources.
 
----
+1. Start **Buyer A** and **Seller C** from the Network Topology section.
+2. Request testnet CKB for each node using its displayed address and the [CKB testnet faucet](https://faucet.nervos.org).
+3. Open a 500 CKB channel from each node to Bottle and wait for both channels to reach `CHANNEL_READY`.
+4. On the seller channel, use **Send 5 CKB keysend** to give Bottle inbound liquidity toward the seller.
+5. In Seller Studio, select a preset or enter custom content, then create the encrypted offer and 1 CKB invoice.
+6. Use **Bridge to Buyer Terminal** for the in-page walkthrough, or copy the offer JSON to transfer it to a separate buyer.
+7. In Buyer Terminal, validate the offer, run the unauthorized-decryption challenge, and pay the invoice.
+8. After successful settlement, decrypt the report and export the report or receipt.
 
-## Problems I Hit and How I Solved Them
+Channel funding is real testnet CKB. Wait for on-chain confirmations; the interface reports channel state and provides status refresh controls. Do not use valuable funds.
 
-1. **Channel Readiness Drops on Testnet**:  
-   During testnet operation, channels occasionally drop out of `CHANNEL_READY` (such as during transient peer disconnects or unconfirmed on-chain reorgs). In the starter kit, this caused the Pay button to become silently disabled with no user explanation.  
-   *Solution*: I added explicit channel diagnostic tracking (`isBuyerReady`, `isSellerReady`, `isRouteReady`) that explains exactly which channel is not ready and provides a dedicated "Refresh Status" button to query the node without reloading the page.
+## Offline simulator
 
-2. **Multi-Tab Session Lock Collisions**:  
-   Opening Buyer and Seller in two separate browser tabs caused the Web Locks API in `lib/node-session.ts` to reject with `"Another tab is currently using this saved node profile"`.  
-   *Solution*: Handled the session lock exception specifically and displayed a prominent warning informing the user to close competing tabs, while cleanly releasing locks on `pagehide`.
+Select **Offline Simulator** to explore the interface without starting Fiber WASM nodes or funding channels. The simulator uses synthetic balances, invoices, routing, and payment results. It does not submit transactions and must not be used as evidence of a real on-chain settlement.
 
-3. **Inbound Liquidity on the Seller Channel**:  
-   Opening a channel puts 100% of the funds on the local side (`Seller: 500 CKB | Bottle: 0 CKB`). In this state, Bottle cannot forward payments *to* the Seller because Bottle has 0 CKB remote balance on that channel.  
-   *Solution*: Integrated the 5 CKB keysend rebalance transfer into the Seller card, shifting liquidity so Bottle has remote capacity to route incoming buyer payments.
+## Security model and limitations
 
----
+FiberVault demonstrates how a payment preimage can also serve as an encryption key. It does not make the seller, buyer, or browser a trusted custodian.
 
-## Threat Model and Known Limitations
+- **Offer and key must both remain private to prevent access.** Anyone with both the ciphertext offer and the settled preimage can decrypt the content.
+- **The routing node learns the preimage.** Bottle participates in the Fiber route and can learn the preimage at settlement. It does not receive the offer through the app, but an intermediary that obtains both the offer and preimage can decrypt it.
+- **The seller retains control of the original.** Encryption and invoice creation happen in the seller's browser. The protocol cannot prevent a seller from keeping or separately sharing the plaintext or key.
+- **Browser node credentials are local.** The current implementation stores Fiber and CKB node key material in the browser's `localStorage`. Use a dedicated testnet browser profile and do not reuse valuable or production keys.
+- **Use one active tab per saved node profile.** Web Locks prevent two tabs from controlling the same saved profile at once. Close other FiberVault tabs before restarting that node.
+- **Recipient key wrapping is experimental.** Helper functions exist, but the optional UI flow is not implemented end-to-end for live offers. Do not rely on it as an intermediary-privacy control.
+- **Testnet only.** This project is not audited, does not support mainnet, and is not a production payment or content-hosting service.
 
-1. **Intermediary Node Visibility**:  
-   When the payment settles, Bottle (the routing node) learns the `payment_preimage`. However, **Bottle never sees the encrypted ciphertext** because the offer JSON is transferred out-of-band directly between the seller and buyer. Bottle cannot decrypt content it does not possess.
-2. **Preimage Replay**:  
-   Anyone who possesses *both* the ciphertext and the settled preimage can decrypt the data. For this reason, a seller must create a fresh offer and invoice for each prospective buyer.
-3. **Optional Recipient Key-Wrapping**:  
-   To defend against an observer who intercepts both the public offer and the on-chain settlement, FiberVault includes an optional key-wrapping mode (`wrapContentKey` / `unwrapContentKey`). In this mode, the seller additionally encrypts the AES key to a buyer-specific secret before creating the invoice.
-4. **Known Limitations**:
-   - The Fiber WASM runtime requires single-tab operation due to exclusive IndexedDB / Web Locks access.
-   - Channel opening confirmation times depend on underlying CKB testnet block mining intervals (typically 1 to 5 minutes).
+## Tests
 
----
+The current test suite contains 18 Node.js tests across `payment.test.mjs` and `vault.test.mjs`. It covers payment submission guards and recovery, AES-GCM encryption and tamper rejection, preimage/hash checks, offer serialization, key-wrapping helpers, replay rejection, and the offline simulator.
 
-## Automated Test Suite
+Run the suite with:
 
-Run the full test suite with:
-```sh
+```bash
 npm test
 ```
 
-### Real Test Output:
+## Repository map
+
 ```text
-> test
-> node --experimental-strip-types --test payment.test.mjs vault.test.mjs
-
-✔ mismatched currency, amount, or payment hash blocks submission (13.16ms)
-✔ attempt is recorded before submission and failed storage prevents spending (2.71ms)
-✔ restored successful and pending payments are checked without resubmission (1.37ms)
-✔ retry requires both explicit intent and a verified failure (1.89ms)
-✔ an expired Invoice is rejected before recording or submitting a new payment (4.49ms)
-✔ a rejected submission clears durable progress so reload does not restore a nonexistent attempt (3.49ms)
-✔ an uncertain send or a polling timeout retains the attempt across reload and never resends it (3.81ms)
-✔ settled payments can still be recovered after their Invoice expires (1.23ms)
-✔ a failed attempt reset cannot silently ignore a browser storage error (2.50ms)
-✔ AES-256-GCM encryption and decryption roundtrip produces identical plaintext (52.04ms)
-✔ Decryption with unauthorized random key is strictly rejected by AES-GCM authentication tag (8.42ms)
-✔ Tampered ciphertext is detected and rejected by GCM authentication tag (9.75ms)
-✔ Cryptographic preimage SHA-256 verification binds payment hash to AES-GCM key (12.97ms)
-✔ Wrong payment hash fails SDK preimage verification (4.15ms)
-✔ Vault structured reports serialize and deserialize with full metadata fidelity (1.78ms)
-✔ Optional wrap-to-buyer-key mode wraps content key and unwrap restores identical key (7.20ms)
-✔ Replayed offer with mismatched attempted payment hash is rejected before submission (1.33ms)
-✔ Simulator engine executes full end-to-end pay-to-unlock flow faithfully (1756.76ms)
-
-ℹ tests 18
-ℹ suites 0
-ℹ pass 18
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
+app/
+  globals.css                  Global design system and responsive styles
+  layout.tsx                   App metadata and Bricolage Grotesque font
+  page.tsx                     Seller and buyer application workflow
+lib/
+  channel-funding.ts            Testnet channel funding checks
+  crypto.ts                     Encryption, decryption, and proof helpers
+  fiber-testnet-runtime.ts      Fiber WASM testnet factory
+  fiber.ts                      Browser nodes, Bottle peer, and channels
+  node-session.ts               Browser-tab node session lock
+  offer.ts                      Encrypted offer schema and validation
+  payment-submission.ts         Submission and recovery safeguards
+  payment.ts                    Invoice validation and payment orchestration
+  progress.ts                   Browser progress and payment-state helpers
+  simulator.ts                  Offline mock Fiber flow
+  vault-presets.ts              Sample encrypted reports
+  vault-types.ts                Report and verification types
+payment.test.mjs                Payment flow tests
+vault.test.mjs                  Encryption, offer, and simulator tests
+next.config.mjs                 Next.js settings and isolation headers
 ```
-
----
-
-## License
-MIT (c) 2026 daodudestiny56-netizen
