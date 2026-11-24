@@ -30,7 +30,6 @@ import {
   encryptedBuyerProfile,
   encryptedSellerProfile,
   savedNodeIdentifier,
-  readEncryptedProgress,
 } from '../lib/progress';
 import { FiberSimulatorEngine, type SimulatedNodeState } from '../lib/simulator';
 
@@ -94,7 +93,7 @@ export default function FiberVaultPage() {
   const [wrappedKeyBundle, setWrappedKeyBundle] = useState<{ wrappedKey: string; wrapIv: string } | null>(null);
 
   // Status and Notifications
-  const [statusMsg, setStatusMsg] = useState<{ type: 'info' | 'success' | 'error'; text: string }>({
+  const [statusMsg, setStatusMsg] = useState<{ type: 'info' | 'success' | 'error' | 'warning'; text: string }>({
     type: 'info',
     text: 'Fiber Testnet WASM engine active. Start Buyer A and Seller C nodes to connect to Bottle.',
   });
@@ -168,11 +167,11 @@ export default function FiberVaultPage() {
       if (ch) {
         const stateName = ch.state.state_name;
         if (ready(ch)) {
-          setStatusMsg({ type: 'success', text: `${role.toUpperCase()} channel is READY.` });
+          setStatusMsg({ type: 'success', text: `${role.toUpperCase()} channel is READY on CKB Testnet.` });
         } else {
           setStatusMsg({
             type: 'info',
-            text: `${role.toUpperCase()} channel state: ${stateName}. Waiting for confirmation on CKB testnet.`,
+            text: `${role.toUpperCase()} channel state: ${stateName}. Awaiting confirmation on CKB testnet.`,
           });
         }
       }
@@ -313,7 +312,7 @@ export default function FiberVaultPage() {
 
         // Optional Key Wrapping in Simulator
         if (useWrappedKey) {
-          const keyToWrap = offer.paymentHash; // simulated binding
+          const keyToWrap = offer.paymentHash;
           const wrapResult = await wrapContentKey(keyToWrap, buyerSecretHex);
           setWrappedKeyBundle(wrapResult);
         }
@@ -451,7 +450,6 @@ export default function FiberVaultPage() {
     try {
       let finalKey = revealedKey;
 
-      // If wrapped key mode was used, unwrap the content key first
       if (wrappedKeyBundle) {
         finalKey = await unwrapContentKey(
           wrappedKeyBundle.wrappedKey,
@@ -520,120 +518,122 @@ export default function FiberVaultPage() {
 
   return (
     <main>
-      {/* Top Header */}
-      <header className="header">
-        <div className="brand">
-          <div className="brand-title">
-            <span>FIBER VAULT</span>
-            <span className="brand-badge">CKB Testnet - Fiber v0.10.1</span>
+      {/* Precision Technical Masthead */}
+      <header className="masthead">
+        <div className="brand-group">
+          <div className="brand-mark">
+            <span className={`status-dot ${engineMode === 'simulator' ? 'sandbox' : ''}`} />
+            <span className="brand-name">FIBERVAULT</span>
           </div>
-          <p className="brand-desc">
-            Trustless Encrypted Intelligence and Asset Marketplace powered by Atomic Fiber TLC Preimage Paywalls
-          </p>
+          <span className="protocol-badge">
+            CKB TESTNET <strong>FIBER v0.10.1</strong>
+          </span>
         </div>
 
-        {/* Engine Mode Toggle */}
-        <div className="engine-toggle">
+        {/* Segmented Engine Switcher */}
+        <div className="engine-segmented">
           <button
-            className={`engine-btn ${engineMode === 'testnet' ? 'active' : ''}`}
+            className={`engine-segment-btn ${engineMode === 'testnet' ? 'active' : ''}`}
             onClick={() => setEngineMode('testnet')}
-            title="Real CKB Testnet WASM Fiber nodes connecting to Bottle hub (Default)"
           >
-            [Testnet] Live WASM Node
+            [Testnet] Live WASM
           </button>
           <button
-            className={`engine-btn ${engineMode === 'simulator' ? 'active' : ''}`}
+            className={`engine-segment-btn ${engineMode === 'simulator' ? 'active' : ''}`}
             onClick={() => setEngineMode('simulator')}
-            title="Offline simulated sandbox for quick local UI smoke-testing"
           >
             [Sandbox] Offline Simulator
           </button>
         </div>
       </header>
 
-      {/* Offline Sandbox Prominent Warning Banner */}
+      {/* Offline Sandbox Prominent Telemetry Banner */}
       {engineMode === 'simulator' && (
-        <div className="alert-bar alert-info" style={{ borderLeft: '4px solid #06b6d4', fontWeight: 600 }}>
-          <span>[OFFLINE SANDBOX MODE]</span>
+        <div className="system-banner info">
+          <span className="banner-code">SANDBOX MODE</span>
           <span>
-            Mock channels and simulated routing are active for local UI testing. Channel balances, fees, and delays are
-            synthetic. Switch to Live WASM Node for real CKB Testnet execution.
+            Offline simulated channels and mock routing active for UI testing. Channel balances and delays are synthetic.
+            Switch to Live WASM for real CKB Testnet transactions.
           </span>
         </div>
       )}
 
-      {/* Multi-Tab Session Warning Banner */}
+      {/* Multi-Tab Conflict Alert */}
       {sessionLockError && (
-        <div className="alert-bar alert-error" style={{ borderLeft: '4px solid #ef4444' }}>
-          <span>[SESSION LOCK CONFLICT]</span>
+        <div className="system-banner error">
+          <span className="banner-code">SESSION LOCK CONFLICT</span>
           <span>{sessionLockError}</span>
         </div>
       )}
 
-      {/* Dynamic Status Notification */}
-      <div className={`alert-bar alert-${statusMsg.type}`}>
-        <span>{statusMsg.type === 'success' ? '[OK]' : statusMsg.type === 'error' ? '[ERR]' : '[INFO]'}</span>
+      {/* Status Alert Bar */}
+      <div className={`system-banner ${statusMsg.type}`}>
+        <span className="banner-code">{statusMsg.type.toUpperCase()}</span>
         <span>{statusMsg.text}</span>
       </div>
 
-      {/* Pipeline Progress Step Tracker */}
-      <nav className="pipeline-bar">
-        <div className={`pipeline-step ${isRouteReady ? 'done' : 'active'}`}>
-          <div className="step-circle">{isRouteReady ? 'OK' : '1'}</div>
-          <span>Channel Setup</span>
+      {/* Stepper Pipeline */}
+      <nav className="pipeline-rail">
+        <div className={`pipeline-node ${isRouteReady ? 'done' : 'active'}`}>
+          <div className="pipeline-number">{isRouteReady ? 'OK' : '1'}</div>
+          <span className="pipeline-label">Channel Setup</span>
         </div>
-        <div className={`pipeline-step ${generatedOfferJson ? 'done' : isRouteReady ? 'active' : ''}`}>
-          <div className="step-circle">{generatedOfferJson ? 'OK' : '2'}</div>
-          <span>Encrypt Offer</span>
+        <div className={`pipeline-node ${generatedOfferJson ? 'done' : isRouteReady ? 'active' : ''}`}>
+          <div className="pipeline-number">{generatedOfferJson ? 'OK' : '2'}</div>
+          <span className="pipeline-label">Encrypt Offer</span>
         </div>
-        <div className={`pipeline-step ${testedWithoutKey ? 'done' : generatedOfferJson ? 'active' : ''}`}>
-          <div className="step-circle">{testedWithoutKey ? 'OK' : '3'}</div>
-          <span>Verify Paywall</span>
+        <div className={`pipeline-node ${testedWithoutKey ? 'done' : generatedOfferJson ? 'active' : ''}`}>
+          <div className="pipeline-number">{testedWithoutKey ? 'OK' : '3'}</div>
+          <span className="pipeline-label">Verify Paywall</span>
         </div>
-        <div className={`pipeline-step ${paymentReceipt?.status === 'Success' ? 'done' : testedWithoutKey ? 'active' : ''}`}>
-          <div className="step-circle">{paymentReceipt?.status === 'Success' ? 'OK' : '4'}</div>
-          <span>Pay 1 CKB Invoice</span>
+        <div className={`pipeline-node ${paymentReceipt?.status === 'Success' ? 'done' : testedWithoutKey ? 'active' : ''}`}>
+          <div className="pipeline-number">{paymentReceipt?.status === 'Success' ? 'OK' : '4'}</div>
+          <span className="pipeline-label">Pay 1 CKB</span>
         </div>
-        <div className={`pipeline-step ${decryptedText ? 'done' : paymentReceipt?.status === 'Success' ? 'active' : ''}`}>
-          <div className="step-circle">{decryptedText ? 'OK' : '5'}</div>
-          <span>Unlock & Decrypt</span>
+        <div className={`pipeline-node ${decryptedText ? 'done' : paymentReceipt?.status === 'Success' ? 'active' : ''}`}>
+          <div className="pipeline-number">{decryptedText ? 'OK' : '5'}</div>
+          <span className="pipeline-label">Unlock & Decrypt</span>
         </div>
       </nav>
 
-      {/* Channel Readiness Status Guide */}
+      {/* Diagnostic Drawer for Testnet Route Readiness */}
       {engineMode === 'testnet' && (!isBuyerReady || !isSellerReady) && (
-        <div style={{ background: '#131b2a', border: '1px solid #1e293b', padding: 12, borderRadius: 8, fontSize: 13 }}>
-          <strong style={{ color: '#f59e0b' }}>Route Readiness Diagnostics:</strong>
-          <ul style={{ margin: '6px 0 0', paddingLeft: 20, color: '#94a3b8' }}>
-            {!channels.buyer && <li>Buyer A node is not started or channel not created.</li>}
-            {channels.buyer && !ready(channels.buyer) && (
-              <li>Buyer A channel is in state: <code>{channels.buyer.state.state_name}</code> (requires CHANNEL_READY).</li>
-            )}
-            {channels.buyer && ready(channels.buyer) && BigInt(channels.buyer.local_balance) < 100_000_000n && (
-              <li>Buyer A has {ckb(channels.buyer.local_balance)} CKB local balance (needs &gt;= 1 CKB to pay).</li>
-            )}
-            {!channels.seller && <li>Seller C node is not started or channel not created.</li>}
-            {channels.seller && !ready(channels.seller) && (
-              <li>Seller C channel is in state: <code>{channels.seller.state.state_name}</code> (requires CHANNEL_READY).</li>
-            )}
-            {channels.seller && ready(channels.seller) && BigInt(channels.seller.remote_balance) < 100_000_000n && (
-              <li>Bottle has {ckb(channels.seller.remote_balance)} CKB on Seller side. Use "Send 5 CKB keysend" to provide Bottle with inbound routing capacity.</li>
-            )}
-          </ul>
+        <div className="system-banner warning">
+          <span className="banner-code">DIAGNOSTICS</span>
+          <div>
+            <strong style={{ display: 'block', marginBottom: 4 }}>Route Readiness Notice:</strong>
+            <ul style={{ margin: 0, paddingLeft: 16 }}>
+              {!channels.buyer && <li>Buyer A node is not started or channel is not opened.</li>}
+              {channels.buyer && !ready(channels.buyer) && (
+                <li>Buyer A channel state is: <code>{channels.buyer.state.state_name}</code> (requires CHANNEL_READY).</li>
+              )}
+              {channels.buyer && ready(channels.buyer) && BigInt(channels.buyer.local_balance) < 100_000_000n && (
+                <li>Buyer A local balance is {ckb(channels.buyer.local_balance)} CKB (needs &gt;= 1 CKB to pay).</li>
+              )}
+              {!channels.seller && <li>Seller C node is not started or channel is not opened.</li>}
+              {channels.seller && !ready(channels.seller) && (
+                <li>Seller C channel state is: <code>{channels.seller.state.state_name}</code> (requires CHANNEL_READY).</li>
+              )}
+              {channels.seller && ready(channels.seller) && BigInt(channels.seller.remote_balance) < 100_000_000n && (
+                <li>Bottle has {ckb(channels.seller.remote_balance)} CKB remote balance on Seller channel. Use keysend transfer to rebalance.</li>
+              )}
+            </ul>
+          </div>
         </div>
       )}
 
-      {/* Network Topology Visualizer */}
-      <section className="topology-card">
-        <p className="topology-title">
-          Network Channels & Liquidity Topology {engineMode === 'simulator' && '(Synthetic Values)'}
+      {/* Topology Bus */}
+      <section className="topology-bus">
+        <p className="section-eyebrow">
+          Multi-Hop Payment Routing Topology {engineMode === 'simulator' && '(Synthetic Sandbox Data)'}
         </p>
-        <div className="topology-nodes">
-          {/* Buyer Node */}
-          <div className={`node-box ${isBuyerReady ? 'ready' : ''}`}>
-            <div className="node-header">
-              <span className="node-name">Buyer A</span>
-              <span className={`node-status-pill ${isBuyerReady ? 'ready' : ''}`}>
+
+        <div className="bus-grid">
+          {/* Buyer A */}
+          <div className={`bus-node-card ${isBuyerReady ? 'ready' : ''}`}>
+            <div className="bus-node-header">
+              <span className="bus-node-title">Buyer A Node</span>
+              <span className={`bus-status-tag ${isBuyerReady ? 'ready' : ''}`}>
                 {engineMode === 'simulator'
                   ? simNodes.buyer.channelReady
                     ? 'CHANNEL_READY'
@@ -643,20 +643,21 @@ export default function FiberVaultPage() {
                   : 'OFFLINE'}
               </span>
             </div>
+
             {engineMode === 'simulator' ? (
               <>
-                <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
+                <p className="bus-metrics" style={{ margin: 0 }}>
                   Local: <strong>{simNodes.buyer.localBalanceCkb} CKB</strong> | Remote: <strong>{simNodes.buyer.remoteBalanceCkb} CKB</strong>
                 </p>
                 {!simNodes.buyer.channelReady && (
-                  <div className="btn-group">
+                  <div className="action-row">
                     {!simNodes.buyer.connected && (
-                      <button className="btn-secondary" disabled={busy} onClick={simStartNodes}>
+                      <button className="btn btn-secondary" disabled={busy} onClick={simStartNodes}>
                         Start Node
                       </button>
                     )}
                     {simNodes.buyer.connected && (
-                      <button className="btn-primary" disabled={busy} onClick={simOpenChannels}>
+                      <button className="btn btn-primary" disabled={busy} onClick={simOpenChannels}>
                         Open 500 CKB Channel
                       </button>
                     )}
@@ -667,26 +668,26 @@ export default function FiberVaultPage() {
               <>
                 {addresses.buyer ? (
                   <>
-                    <code style={{ fontSize: 11 }}>{addresses.buyer.slice(0, 24)}...</code>
-                    <a href="https://faucet.nervos.org" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#10b981' }}>
-                      Get Testnet CKB
+                    <code style={{ fontSize: 11, color: 'var(--text-low)' }}>{addresses.buyer.slice(0, 24)}...</code>
+                    <a href="https://faucet.nervos.org" target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--signal-accent)', textDecoration: 'none' }}>
+                      Request Testnet CKB
                     </a>
                     {channels.buyer && (
-                      <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
-                        Local: {ckb(channels.buyer.local_balance)} CKB | Bottle: {ckb(channels.buyer.remote_balance)} CKB
+                      <p className="bus-metrics" style={{ margin: 0 }}>
+                        Local: <strong>{ckb(channels.buyer.local_balance)} CKB</strong> | Bottle: <strong>{ckb(channels.buyer.remote_balance)} CKB</strong>
                       </p>
                     )}
-                    <div className="btn-group">
-                      <button className="btn-secondary" disabled={busy} onClick={() => wasmOpenChannel('buyer')}>
+                    <div className="action-row">
+                      <button className="btn btn-secondary" disabled={busy} onClick={() => wasmOpenChannel('buyer')}>
                         {channels.buyer ? 'Reconnect Channel' : `Open ${channelFundingCkb} CKB Channel`}
                       </button>
-                      <button className="btn-secondary" disabled={busy} onClick={() => refreshWasmChannel('buyer')}>
+                      <button className="btn btn-secondary" disabled={busy} onClick={() => refreshWasmChannel('buyer')}>
                         Refresh Status
                       </button>
                     </div>
                   </>
                 ) : (
-                  <button className="btn-secondary" disabled={busy || !loaded} onClick={() => wasmStartNode('buyer')}>
+                  <button className="btn btn-secondary" disabled={busy || !loaded} onClick={() => wasmStartNode('buyer')}>
                     Start WASM Node
                   </button>
                 )}
@@ -694,35 +695,37 @@ export default function FiberVaultPage() {
             )}
           </div>
 
-          {/* Hop Arrow 1 */}
-          <div className="channel-arrow">
-            <span>TLC Multi-Hop</span>
+          {/* Hop Connector 1 */}
+          <div className="bus-hop-connector">
+            <span>TLC Hop 1</span>
+            <div className="bus-hop-line" />
           </div>
 
           {/* Bottle Routing Hub */}
-          <div className="node-box ready">
-            <div className="node-header">
-              <span className="node-name">Bottle Hub B</span>
-              <span className="node-status-pill ready">ROUTING HUB</span>
+          <div className="bus-node-card ready">
+            <div className="bus-node-header">
+              <span className="bus-node-title">Bottle B Router</span>
+              <span className="bus-status-tag ready">INTERMEDIARY HUB</span>
             </div>
-            <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
+            <p className="bus-metrics" style={{ margin: 0 }}>
               Pubkey: <code>0x02b6d4e...be71</code>
             </p>
-            <p style={{ margin: 0, fontSize: 12, color: '#10b981' }}>
-              Multi-Hop Trampoline Routing Enabled
-            </p>
+            <span style={{ fontSize: 11, color: 'var(--signal-accent)' }}>
+              Trampoline Multi-Hop Active
+            </span>
           </div>
 
-          {/* Hop Arrow 2 */}
-          <div className="channel-arrow">
-            <span>TLC Multi-Hop</span>
+          {/* Hop Connector 2 */}
+          <div className="bus-hop-connector">
+            <span>TLC Hop 2</span>
+            <div className="bus-hop-line" />
           </div>
 
-          {/* Seller Node */}
-          <div className={`node-box ${isSellerReady ? 'ready' : ''}`}>
-            <div className="node-header">
-              <span className="node-name">Seller C</span>
-              <span className={`node-status-pill ${isSellerReady ? 'ready' : ''}`}>
+          {/* Seller C */}
+          <div className={`bus-node-card ${isSellerReady ? 'ready' : ''}`}>
+            <div className="bus-node-header">
+              <span className="bus-node-title">Seller C Node</span>
+              <span className={`bus-status-tag ${isSellerReady ? 'ready' : ''}`}>
                 {engineMode === 'simulator'
                   ? simNodes.seller.channelReady
                     ? 'CHANNEL_READY'
@@ -732,13 +735,14 @@ export default function FiberVaultPage() {
                   : 'OFFLINE'}
               </span>
             </div>
+
             {engineMode === 'simulator' ? (
               <>
-                <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
+                <p className="bus-metrics" style={{ margin: 0 }}>
                   Local: <strong>{simNodes.seller.localBalanceCkb} CKB</strong> | Remote: <strong>{simNodes.seller.remoteBalanceCkb} CKB</strong>
                 </p>
                 {simNodes.seller.channelReady && (
-                  <button className="btn-secondary" disabled={busy} onClick={simMoveLiquidity} style={{ padding: '6px 10px', fontSize: 11 }}>
+                  <button className="btn btn-secondary" disabled={busy} onClick={simMoveLiquidity} style={{ padding: '6px 10px', fontSize: 11 }}>
                     Rebalance 5 CKB to Bottle
                   </button>
                 )}
@@ -747,24 +751,24 @@ export default function FiberVaultPage() {
               <>
                 {addresses.seller ? (
                   <>
-                    <code style={{ fontSize: 11 }}>{addresses.seller.slice(0, 24)}...</code>
-                    <a href="https://faucet.nervos.org" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#10b981' }}>
-                      Get Testnet CKB
+                    <code style={{ fontSize: 11, color: 'var(--text-low)' }}>{addresses.seller.slice(0, 24)}...</code>
+                    <a href="https://faucet.nervos.org" target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--signal-accent)', textDecoration: 'none' }}>
+                      Request Testnet CKB
                     </a>
                     {channels.seller && (
-                      <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
-                        Local: {ckb(channels.seller.local_balance)} CKB | Bottle: {ckb(channels.seller.remote_balance)} CKB
+                      <p className="bus-metrics" style={{ margin: 0 }}>
+                        Local: <strong>{ckb(channels.seller.local_balance)} CKB</strong> | Bottle: <strong>{ckb(channels.seller.remote_balance)} CKB</strong>
                       </p>
                     )}
-                    <div className="btn-group">
-                      <button className="btn-secondary" disabled={busy} onClick={() => wasmOpenChannel('seller')}>
+                    <div className="action-row">
+                      <button className="btn btn-secondary" disabled={busy} onClick={() => wasmOpenChannel('seller')}>
                         {channels.seller ? 'Reconnect Channel' : `Open ${channelFundingCkb} CKB Channel`}
                       </button>
-                      <button className="btn-secondary" disabled={busy} onClick={() => refreshWasmChannel('seller')}>
+                      <button className="btn btn-secondary" disabled={busy} onClick={() => refreshWasmChannel('seller')}>
                         Refresh Status
                       </button>
                       <button
-                        className="btn-secondary"
+                        className="btn btn-secondary"
                         disabled={busy || !channels.seller || !ready(channels.seller) || BigInt(channels.seller.local_balance) < 500_000_000n}
                         onClick={wasmMoveLiquidity}
                       >
@@ -773,7 +777,7 @@ export default function FiberVaultPage() {
                     </div>
                   </>
                 ) : (
-                  <button className="btn-secondary" disabled={busy || !loaded} onClick={() => wasmStartNode('seller')}>
+                  <button className="btn btn-secondary" disabled={busy || !loaded} onClick={() => wasmStartNode('seller')}>
                     Start WASM Node
                   </button>
                 )}
@@ -783,32 +787,30 @@ export default function FiberVaultPage() {
         </div>
       </section>
 
-      {/* Main Two-Column Workspace */}
-      <div className="workspace-grid">
-        {/* Column 1: Seller Studio */}
-        <section className="panel-card">
-          <div className="panel-header">
-            <h2 className="panel-title">
-              <span>Seller Studio</span>
-            </h2>
-            <span className="brand-badge">{currentReport.classification}</span>
+      {/* Main Two-Pane Editorial Workspace */}
+      <div className="workspace-columns">
+        {/* Pane 1: Seller Studio */}
+        <section className="terminal-pane">
+          <div className="pane-header">
+            <h2 className="pane-title">Seller Studio</h2>
+            <span className="classification-tag">{currentReport.classification}</span>
           </div>
 
-          {/* Preset Intelligence Picker */}
-          <div className="preset-selector">
-            <label>Select Intelligence Preset or Custom Content</label>
-            <div className="preset-pills">
+          {/* Preset Selector Chips */}
+          <div className="form-unit">
+            <span className="field-label">Document Preset</span>
+            <div className="preset-strip">
               {VAULT_PRESETS.map((p, idx) => (
                 <button
                   key={p.id}
-                  className={`preset-pill ${activePresetIndex === idx ? 'active' : ''}`}
+                  className={`preset-chip ${activePresetIndex === idx ? 'active' : ''}`}
                   onClick={() => selectPreset(idx)}
                 >
                   {p.category === 'research-brief' ? 'Energy Research Brief' : p.category === 'macro-analysis' ? 'Macro Velocity' : 'Design Tokens'}
                 </button>
               ))}
               <button
-                className={`preset-pill ${activePresetIndex === VAULT_PRESETS.length ? 'active' : ''}`}
+                className={`preset-chip ${activePresetIndex === VAULT_PRESETS.length ? 'active' : ''}`}
                 onClick={() => selectPreset(VAULT_PRESETS.length)}
               >
                 Custom Content
@@ -816,9 +818,9 @@ export default function FiberVaultPage() {
             </div>
           </div>
 
-          {/* Optional Key Wrapping Toggle */}
-          <div style={{ background: '#0a0e17', padding: 12, borderRadius: 8, border: '1px solid #1e293b' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textTransform: 'none', color: '#f1f5f9' }}>
+          {/* Optional Key Wrapping Option */}
+          <div style={{ background: 'var(--bg-elevated)', padding: 12, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-hairline)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-high)' }}>
               <input
                 type="checkbox"
                 checked={useWrappedKey}
@@ -827,15 +829,15 @@ export default function FiberVaultPage() {
               />
               <strong>Optional: Wrap Content Key to Buyer Secret (Intermediary Immunity)</strong>
             </label>
-            <p style={{ margin: '6px 0 0', fontSize: 11, color: '#94a3b8' }}>
-              When enabled, the AES key is encrypted to the buyer secret so intermediate routing nodes (Bottle) who see
-              the settlement preimage cannot decrypt the ciphertext.
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-low)' }}>
+              Encrypts the AES key to the buyer secret so routing nodes (Bottle) learning the preimage cannot unwrap content.
             </p>
           </div>
 
-          <div>
-            <label>Title & Classification</label>
+          <div className="form-unit">
+            <span className="field-label">Document Title</span>
             <input
+              type="text"
               value={currentReport.title}
               disabled={activePresetIndex < VAULT_PRESETS.length}
               onChange={(e) => {
@@ -845,8 +847,8 @@ export default function FiberVaultPage() {
             />
           </div>
 
-          <div>
-            <label>Public Executive Teaser (Free Unredacted Preview)</label>
+          <div className="form-unit">
+            <span className="field-label">Executive Teaser (Public Free Preview)</span>
             <textarea
               rows={3}
               value={currentReport.previewTeaser}
@@ -858,8 +860,8 @@ export default function FiberVaultPage() {
             />
           </div>
 
-          <div>
-            <label>Classified Payload (AES-256-GCM Encrypted Paywall)</label>
+          <div className="form-unit">
+            <span className="field-label">Classified Payload (AES-256-GCM Locked Paywall)</span>
             <textarea
               rows={5}
               value={currentReport.classifiedPayload}
@@ -871,29 +873,28 @@ export default function FiberVaultPage() {
             />
           </div>
 
-          {/* Offer Generation Actions */}
-          <div className="btn-group">
+          <div className="action-row">
             <button
-              className="btn-primary"
+              className="btn btn-primary"
               disabled={busy || !isRouteReady || Boolean(generatedOfferJson)}
               onClick={handleCreateOffer}
             >
-              Encrypt and Create 1 CKB Invoice
+              Encrypt & Mint 1 CKB Invoice
             </button>
             {generatedOfferJson && (
-              <button className="btn-secondary" onClick={handleBridgeToBuyer}>
-                1-Click Bridge to Buyer
+              <button className="btn btn-secondary" onClick={handleBridgeToBuyer}>
+                Bridge to Buyer Terminal
               </button>
             )}
           </div>
 
           {generatedOfferJson && (
-            <div>
-              <label>Generated Offer Payload (Public JSON)</label>
+            <div className="form-unit">
+              <span className="field-label">Generated Encrypted Offer Payload</span>
               <textarea rows={4} readOnly value={generatedOfferJson} />
               <button
-                className="btn-secondary"
-                style={{ marginTop: 8 }}
+                className="btn btn-secondary"
+                style={{ alignSelf: 'flex-start' }}
                 onClick={() => {
                   navigator.clipboard.writeText(generatedOfferJson);
                   setStatusMsg({ type: 'info', text: 'Encrypted offer JSON copied to clipboard.' });
@@ -905,21 +906,18 @@ export default function FiberVaultPage() {
           )}
         </section>
 
-        {/* Column 2: Buyer Terminal */}
-        <section className="panel-card">
-          <div className="panel-header">
-            <h2 className="panel-title">
-              <span>Buyer Marketplace Terminal</span>
-            </h2>
-            <span className="brand-badge">Fiber Pay-To-Unlock</span>
+        {/* Pane 2: Buyer Terminal */}
+        <section className="terminal-pane">
+          <div className="pane-header">
+            <h2 className="pane-title">Buyer Terminal</h2>
+            <span className="classification-tag">ATOMIC PAYWALL</span>
           </div>
 
-          {/* Received Offer Input */}
-          <div>
-            <label>Received Encrypted Offer</label>
+          <div className="form-unit">
+            <span className="field-label">Offer Payload Input</span>
             <textarea
               rows={3}
-              placeholder="Paste encrypted offer JSON here or use '1-Click Bridge' from Seller Studio"
+              placeholder="Paste encrypted offer JSON here or use 'Bridge to Buyer Terminal' from Seller Studio"
               value={buyerInputOffer}
               onChange={(e) => {
                 setBuyerInputOffer(e.target.value);
@@ -930,7 +928,8 @@ export default function FiberVaultPage() {
 
           {!parsedOffer ? (
             <button
-              className="btn-secondary"
+              className="btn btn-secondary"
+              style={{ alignSelf: 'flex-start' }}
               disabled={busy || !buyerInputOffer.trim()}
               onClick={handleValidateOffer}
             >
@@ -938,86 +937,78 @@ export default function FiberVaultPage() {
             </button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* Public Teaser Card */}
-              <div style={{ background: '#0a0e17', padding: 14, borderRadius: 8, border: '1px solid #1e293b' }}>
+              {/* Unredacted Public Teaser */}
+              <div style={{ background: 'var(--bg-elevated)', padding: 14, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-hairline)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 700 }}>{currentReport.title}</span>
-                  <span className="brand-badge">{currentReport.priceCkb} CKB</span>
+                  <span className="classification-tag">{currentReport.priceCkb} CKB</span>
                 </div>
-                <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#94a3b8' }}>
-                  Author: {currentReport.author} | Severity: {currentReport.severityOrRating}
+                <p style={{ margin: '0 0 8px 0', fontSize: 11, color: 'var(--text-low)' }}>
+                  Author: {currentReport.author} | Classification: {currentReport.severityOrRating}
                 </p>
-                <p style={{ margin: 0, fontSize: 13, color: '#e2e8f0', whiteSpace: 'pre-wrap' }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-high)', whiteSpace: 'pre-wrap' }}>
                   {currentReport.previewTeaser}
                 </p>
               </div>
 
-              {/* Paywall Classified Section Preview */}
+              {/* Classified Redacted Paywall Box */}
               {!decryptedText && (
-                <div className="redacted-paywall">
-                  <div className="redacted-banner">
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8' }}>
-                      CLASSIFIED PAYWALL SECTION
-                    </span>
-                    <span className="redacted-lock-pill">
-                      LOCKED - AES-256-GCM
-                    </span>
+                <div className="classified-redaction-box">
+                  <div className="redaction-header">
+                    <span>CLASSIFIED CONTENT PAYWALL</span>
+                    <span className="redaction-lock-stamp">LOCKED - AES-256-GCM</span>
                   </div>
-                  <div className="redacted-bars">
-                    <div className="redacted-bar" style={{ width: '92%' }} />
-                    <div className="redacted-bar" style={{ width: '78%' }} />
-                    <div className="redacted-bar" style={{ width: '85%' }} />
-                    <div className="redacted-bar" style={{ width: '64%' }} />
+                  <div className="classified-bars">
+                    <div className="classified-solid-bar" style={{ width: '95%' }} />
+                    <div className="classified-solid-bar" style={{ width: '80%' }} />
+                    <div className="classified-solid-bar" style={{ width: '88%' }} />
+                    <div className="classified-solid-bar" style={{ width: '65%' }} />
                   </div>
                 </div>
               )}
 
-              {/* Verification & Pay Actions */}
-              <div className="btn-group">
+              {/* Actions */}
+              <div className="action-row">
                 {!testedWithoutKey && (
-                  <button className="btn-secondary" disabled={busy} onClick={handleTestWithoutKey}>
+                  <button className="btn btn-secondary" disabled={busy} onClick={handleTestWithoutKey}>
                     Challenge: Decrypt Without Key
                   </button>
                 )}
 
                 {testedWithoutKey && !paymentReceipt && (
-                  <button className="btn-primary" disabled={busy || !isRouteReady} onClick={handlePayOffer}>
+                  <button className="btn btn-primary" disabled={busy || !isRouteReady} onClick={handlePayOffer}>
                     Pay 1 CKB with Fiber Network
                   </button>
                 )}
 
                 {paymentReceipt?.status === 'Success' && !decryptedText && (
-                  <button className="btn-primary" disabled={busy || !revealedKey} onClick={handleDecryptWithRevealedKey}>
+                  <button className="btn btn-primary" disabled={busy || !revealedKey} onClick={handleDecryptWithRevealedKey}>
                     Decrypt with Revealed Preimage Key
                   </button>
                 )}
               </div>
 
-              {/* Decryption Rejected Warning Box */}
+              {/* Decryption Rejected Warning */}
               {decryptError && !paymentReceipt && (
-                <div className="alert-bar alert-error">
-                  <span>[Rejected]</span>
-                  <span style={{ fontSize: 12 }}>{decryptError}</span>
+                <div className="system-banner error">
+                  <span className="banner-code">REJECTED</span>
+                  <span>{decryptError}</span>
                 </div>
               )}
 
-              {/* Payment Receipt Box */}
+              {/* Settled Payment Receipt */}
               {paymentReceipt?.status === 'Success' && (
-                <div style={{ background: '#07150f', border: '1px solid #10b981', padding: 14, borderRadius: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#10b981' }}>
-                      Payment Settled
-                    </span>
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>
-                      Amount: 1 CKB | Routing Fee: {paymentReceipt.fee} CKB
-                    </span>
+                <div className="settlement-card">
+                  <div className="settlement-title-row">
+                    <span className="settlement-title">Payment Settled</span>
+                    <span className="settlement-meta">Amount: 1 CKB | Fee: {paymentReceipt.fee} CKB</span>
                   </div>
-                  <p style={{ margin: '4px 0', fontSize: 12, wordBreak: 'break-all' }}>
+                  <div className="settlement-data-row">
                     Payment Hash: <code>{paymentReceipt.payment_hash}</code>
-                  </p>
-                  <p style={{ margin: '4px 0', fontSize: 12, wordBreak: 'break-all' }}>
-                    Revealed Preimage (AES Key): <code style={{ color: '#34d399' }}>{revealedKey}</code>
-                  </p>
+                  </div>
+                  <div className="settlement-data-row">
+                    Revealed Preimage (AES Key): <code>{revealedKey}</code>
+                  </div>
                 </div>
               )}
             </div>
@@ -1025,94 +1016,90 @@ export default function FiberVaultPage() {
         </section>
       </div>
 
-      {/* Decrypted Full Result Showcase */}
+      {/* Unlocked Decrypted View */}
       {decryptedText && (
-        <section className="decrypted-view">
-          <div className="decrypted-header">
+        <section className="decrypted-showcase">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: 20, color: '#34d399' }}>
-                Intelligence Report Unlocked and Verified
-              </h3>
-              <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#94a3b8' }}>
-                AES-256-GCM authenticated decryption successful using Fiber TLC revealed preimage
+              <h3 className="decrypted-title">Document Decrypted and Authenticated</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-medium)' }}>
+                AES-256-GCM authentication tag verified using Fiber TLC revealed settlement preimage
               </p>
             </div>
-            <div className="btn-group">
-              <button className="btn-secondary" onClick={downloadReport}>
-                Download Full Report (.md)
+            <div className="action-row">
+              <button className="btn btn-secondary" onClick={downloadReport}>
+                Download Report (.md)
               </button>
-              <button className="btn-secondary" onClick={downloadReceipt}>
-                Download Cryptographic Receipt (.json)
+              <button className="btn btn-secondary" onClick={downloadReceipt}>
+                Download Receipt (.json)
               </button>
-              <button className="btn-danger" onClick={resetOfferFlow}>
+              <button className="btn btn-danger" onClick={resetOfferFlow}>
                 Start Another Offer
               </button>
             </div>
           </div>
 
-          <div className="decrypted-content">
+          <div className="decrypted-body">
             {decryptedReport ? (
               <div>
-                <h2 style={{ color: '#6ee7b7', borderBottom: '1px solid #1f3d30', paddingBottom: 8 }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: 16, color: 'var(--signal-accent)' }}>
                   {decryptedReport.title}
-                </h2>
-                <div style={{ whiteSpace: 'pre-wrap', color: '#a7f3d0' }}>
+                </h4>
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                   {decryptedReport.classifiedPayload}
                 </div>
                 {decryptedReport.attachmentFileName && (
-                  <div style={{ marginTop: 16, padding: 12, background: '#0f241a', borderRadius: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399' }}>
-                      Attached Asset: {decryptedReport.attachmentFileName}
+                  <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-hairline)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--signal-accent)', fontFamily: 'var(--font-mono)' }}>
+                      ATTACHMENT: {decryptedReport.attachmentFileName}
                     </span>
-                    <pre style={{ margin: '8px 0 0', fontSize: 11, color: '#d1fae5' }}>
+                    <pre style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--text-high)' }}>
                       {decryptedReport.attachmentData}
                     </pre>
                   </div>
                 )}
               </div>
             ) : (
-              <pre>{decryptedText}</pre>
+              <div>{decryptedText}</div>
             )}
           </div>
         </section>
       )}
 
-      {/* Cryptographic Proof & Receipt Inspector */}
+      {/* Cryptographic Verification Ledger */}
       {parsedOffer && (
-        <section className="audit-panel">
-          <p className="topology-title">Cryptographic Verification Audit Trail</p>
-          <div className="audit-grid">
-            <div className="audit-item">
-              <span className="audit-key">Cipher Algorithm</span>
-              <span className="audit-val">AES-256-GCM (Authenticated Encryption)</span>
+        <section className="ledger-card">
+          <p className="section-eyebrow">Cryptographic Invariant & Ledger Verification</p>
+          <div className="ledger-grid">
+            <div className="ledger-entry">
+              <span className="ledger-key">Cipher Specification</span>
+              <span className="ledger-value">AES-256-GCM (Authenticated Encryption)</span>
             </div>
-            <div className="audit-item">
-              <span className="audit-key">Initialization Vector (IV - 96 bit)</span>
-              <span className="audit-val">{parsedOffer.iv}</span>
+            <div className="ledger-entry">
+              <span className="ledger-key">Initialization Vector (96-bit)</span>
+              <span className="ledger-value">{parsedOffer.iv}</span>
             </div>
-            <div className="audit-item">
-              <span className="audit-key">Fiber Invoice Payment Hash</span>
-              <span className="audit-val">{parsedOffer.paymentHash}</span>
+            <div className="ledger-entry">
+              <span className="ledger-key">Fiber Invoice Payment Hash</span>
+              <span className="ledger-value">{parsedOffer.paymentHash}</span>
             </div>
-            <div className="audit-item">
-              <span className="audit-key">Settled Preimage (AES Key)</span>
-              <span className="audit-val">{revealedKey || '0x... [LOCKED UNTIL PAYMENT SETTLEMENT]'}</span>
+            <div className="ledger-entry">
+              <span className="ledger-key">Settled TLC Preimage (AES Key)</span>
+              <span className="ledger-value">{revealedKey || '0x... [LOCKED UNTIL PAYMENT SETTLEMENT]'}</span>
             </div>
-            <div className="audit-item">
-              <span className="audit-key">Cryptographic Invariant Check</span>
-              <span className="audit-val">
+            <div className="ledger-entry">
+              <span className="ledger-key">Mathematical Proof Check</span>
+              <span className={`ledger-value ${verification?.valid ? 'confirmed' : ''}`}>
                 {verification?.valid ? (
-                  <strong style={{ color: '#34d399' }}>
-                    SHA256(Preimage) === PaymentHash [MATHEMATICALLY VERIFIED]
-                  </strong>
+                  'SHA-256(Preimage) === PaymentHash [VERIFIED]'
                 ) : (
-                  'Pending payment preimage release...'
+                  'Pending settlement verification...'
                 )}
               </span>
             </div>
-            <div className="audit-item">
-              <span className="audit-key">Last Hop Routing Channel</span>
-              <span className="audit-val">{parsedOffer.lastHop.channel_outpoint.slice(0, 24)}...</span>
+            <div className="ledger-entry">
+              <span className="ledger-key">Last-Hop Channel Outpoint</span>
+              <span className="ledger-value">{parsedOffer.lastHop.channel_outpoint.slice(0, 24)}...</span>
             </div>
           </div>
         </section>
