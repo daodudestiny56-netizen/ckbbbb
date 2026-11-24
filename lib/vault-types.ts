@@ -1,4 +1,4 @@
-export type IntelligenceCategory = 'cybersecurity' | 'financial-alpha' | 'ai-prompt' | 'custom';
+export type IntelligenceCategory = 'research-brief' | 'macro-analysis' | 'design-tokens' | 'custom';
 
 export type VaultIntelligenceReport = {
   id: string;
@@ -21,5 +21,6 @@ export type DecryptionVerification = {
   preimageMatchesHash: boolean;
   computedPaymentHash?: string;
   expectedPaymentHash?: string;
+  wrappedKeyVerified?: boolean;
   error?: string;
 };

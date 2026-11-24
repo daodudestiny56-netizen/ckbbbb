@@ -1,8 +1,11 @@
+import { verifyPreimageHash } from '@fiber-pay/sdk';
 import type { VaultIntelligenceReport, DecryptionVerification } from './vault-types.ts';
 
 export type EncryptedPayload = {
   ciphertext: `0x${string}`;
   iv: `0x${string}`;
+  wrappedKey?: `0x${string}`;
+  wrapIv?: `0x${string}`;
 };
 
 export const toHex = (bytes: Uint8Array) =>
@@ -58,17 +61,59 @@ export async function testDecryption(payload: EncryptedPayload, keyHex: string):
   }
 }
 
+/**
+ * Optional Recipient Key-Wrapping Mode:
+ * Encrypts the content AES key using a shared secret or buyer public key derivation.
+ * Ensures an intermediary node (Bottle) who sees the revealed payment preimage cannot
+ * decrypt the content unless they also hold the buyer secret.
+ */
+export async function wrapContentKey(contentKeyHex: string, buyerSecretHex: string) {
+  const wrapKeyBytes = fromHex(buyerSecretHex);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const wrapKey = await crypto.subtle.importKey(
+    'raw', new Uint8Array(wrapKeyBytes), { name: 'AES-GCM' }, false, ['encrypt'],
+  );
+  const wrapped = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, wrapKey, new TextEncoder().encode(contentKeyHex),
+  );
+  return {
+    wrappedKey: toHex(new Uint8Array(wrapped)),
+    wrapIv: toHex(iv),
+  };
+}
+
+export async function unwrapContentKey(
+  wrappedKeyHex: string,
+  wrapIvHex: string,
+  buyerSecretHex: string,
+): Promise<string> {
+  const wrapKeyBytes = fromHex(buyerSecretHex);
+  const wrapKey = await crypto.subtle.importKey(
+    'raw', new Uint8Array(wrapKeyBytes), { name: 'AES-GCM' }, false, ['decrypt'],
+  );
+  const unwrapped = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(fromHex(wrapIvHex)) },
+    wrapKey,
+    new Uint8Array(fromHex(wrappedKeyHex)),
+  );
+  return new TextDecoder().decode(unwrapped);
+}
+
 export async function verifyPreimageProof(
   preimageHex: string,
   expectedPaymentHashHex: string,
 ): Promise<DecryptionVerification> {
   try {
+    const sdkMatches = verifyPreimageHash(
+      preimageHex as `0x${string}`,
+      expectedPaymentHashHex as `0x${string}`,
+      'sha256',
+    );
     const computedHash = await sha256Hex(preimageHex);
-    const matches = computedHash.toLowerCase() === expectedPaymentHashHex.toLowerCase();
     return {
-      valid: matches,
+      valid: sdkMatches,
       sha256Proof: true,
-      preimageMatchesHash: matches,
+      preimageMatchesHash: sdkMatches,
       computedPaymentHash: computedHash,
       expectedPaymentHash: expectedPaymentHashHex,
     };
@@ -77,7 +122,7 @@ export async function verifyPreimageProof(
       valid: false,
       sha256Proof: false,
       preimageMatchesHash: false,
-      error: err instanceof Error ? err.message : 'Cryptographic proof failed',
+      error: err instanceof Error ? err.message : 'Cryptographic proof verification failed',
     };
   }
 }
